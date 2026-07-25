@@ -261,7 +261,7 @@ export default function LoginPage() {
           </p>
 
           {/* Illustration */}
-          <div className="max-w-md hidden lg:block">
+          <div className="max-w-md">
             <KknIllustration />
           </div>
 
