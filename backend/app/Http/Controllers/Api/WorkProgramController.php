@@ -1,0 +1,6 @@
+<?php
+namespace App\Http\Controllers\Api;
+use App\Http\Controllers\Controller;
+use App\Models\WorkProgram;
+use Illuminate\Http\Request;
+class WorkProgramController extends Controller { public function index(){return response()->json(['success'=>true,'data'=>['programs'=>WorkProgram::latest()->get()]]);} public function store(Request $r){$d=$r->validate(['nama'=>'required|string|max:150','deskripsi'=>'nullable|string','penanggung_jawab'=>'nullable|string|max:150','target_tanggal'=>'nullable|date','status'=>'nullable|in:rencana,persiapan,berjalan,selesai','progress'=>'nullable|integer|min:0|max:100','catatan'=>'nullable|string']);$p=WorkProgram::create($d);return response()->json(['success'=>true,'data'=>['program'=>$p]],201);} public function update(Request $r,WorkProgram $workProgram){$d=$r->validate(['nama'=>'sometimes|required|string|max:150','deskripsi'=>'nullable|string','penanggung_jawab'=>'nullable|string|max:150','target_tanggal'=>'nullable|date','status'=>'nullable|in:rencana,persiapan,berjalan,selesai','progress'=>'nullable|integer|min:0|max:100','catatan'=>'nullable|string']);$workProgram->update($d);return response()->json(['success'=>true,'data'=>['program'=>$workProgram->fresh()]]);} public function destroy(WorkProgram $workProgram){$workProgram->delete();return response()->json(['success'=>true]);} }

@@ -1,0 +1,16 @@
+﻿# Build artifacts
+*-upload.zip
+*.zip
+
+# Logs
+*.log
+*.err
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Env
+.env
+.env.local
+.env.*.local
