@@ -251,7 +251,7 @@ export default function LoginPage() {
             <span className="text-accent-cyan text-xs font-extrabold tracking-[0.15em] uppercase">Desa Cangkuangkulon</span>
           </div>
 
-          <h1 className="font-heading text-5xl xl:text-6xl font-black leading-[1.05] text-white">
+          <h1 className="font-heading text-4xl sm:text-5xl xl:text-6xl font-black leading-[1.05] text-white">
             Hadir <br />
             <span className="gradient-text-glow">Tepat</span> Waktu.
           </h1>
@@ -261,12 +261,12 @@ export default function LoginPage() {
           </p>
 
           {/* Illustration */}
-          <div className="max-w-md">
+          <div className="max-w-md hidden lg:block">
             <KknIllustration />
           </div>
 
           {/* Feature cards */}
-          <div className="grid grid-cols-3 gap-3 pt-2">
+          <div className="grid grid-cols-3 gap-3 pt-2 hidden lg:grid">
             <Feature
               title="Face Recognition"
               desc="Absen wajah anti-titip"
@@ -286,7 +286,7 @@ export default function LoginPage() {
         </div>
 
         {/* Bottom marquee */}
-        <div className="space-y-2 overflow-hidden">
+        <div className="space-y-2 overflow-hidden hidden lg:block">
           <Marquee text="Universitas Langlangbuana Bandung Ã‚Â· KKNM Cangkuangkulon Ã‚Â· Development by KingFaisal" count={6} />
           <Marquee text="Face Recognition Ã‚Â· Kehadiran Real-Time Ã‚Â· UNLA Bandung" count={6} reverse />
         </div>
