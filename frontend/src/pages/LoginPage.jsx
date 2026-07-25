@@ -220,7 +220,7 @@ export default function LoginPage() {
   };
 
   return (
-    <div ref={containerRef} className="min-h-screen flex relative overflow-hidden" style={{ background: '#05050f' }}>
+    <div ref={containerRef} className="min-h-screen flex flex-col lg:flex-row relative overflow-hidden" style={{ background: '#05050f' }}>
       <div className="gradient-mesh" />
       <Particles />
 
@@ -229,7 +229,7 @@ export default function LoginPage() {
       <Orb style={{ top: '40%', left: '30%', width: 300, height: 300, background: 'radial-gradient(circle, rgba(255,0,127,0.1) 0%, transparent 60%)', filter: 'blur(50px)', animation: 'float 10s ease-in-out infinite' }} />
 
       {/* Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â LEFT PANEL Ã¢â‚¬â€ Branding + Illustration Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â */}
-      <div className="gsap-left-panel hidden lg:flex flex-col justify-between w-1/2 relative z-10 p-12 overflow-hidden">
+      <div className="gsap-left-panel flex flex-col justify-between w-full lg:w-1/2 relative z-10 p-6 sm:p-10 lg:p-12 overflow-hidden">
 
         {/* Top logo */}
         <div className="flex items-center gap-3">
@@ -297,7 +297,7 @@ export default function LoginPage() {
         <div className="w-full max-w-md animate-fade-in-up">
 
           {/* Mobile-only brand header */}
-          <div className="lg:hidden text-center mb-8">
+          <div className="hidden text-center mb-8">
             <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/5 border border-accent-cyan/30 mb-4">
               <div className="w-1.5 h-1.5 rounded-full bg-accent-cyan animate-pulse" />
               <span className="text-accent-cyan text-xs font-bold tracking-wider uppercase">Absensi KKN</span>
