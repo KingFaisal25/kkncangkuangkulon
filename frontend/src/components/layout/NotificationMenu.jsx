@@ -1,0 +1,15 @@
+import { useCallback, useEffect, useRef, useState } from 'react';
+import notificationService from '../../services/notificationService';
+
+export default function NotificationMenu() {
+    const [open, setOpen] = useState(false);
+    const [notifications, setNotifications] = useState([]);
+    const [unread, setUnread] = useState(0);
+    const ref = useRef(null);
+    const load = useCallback(async () => { try { const response = await notificationService.getAll(); setNotifications(response.data?.data || []); setUnread(response.data?.unread_count || 0); } catch { /* notifikasi tidak mengganggu layout */ } }, []);
+    useEffect(() => { load(); const timer = setInterval(load, 15000); return () => clearInterval(timer); }, [load]);
+    useEffect(() => { const close = e => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); }; document.addEventListener('mousedown', close); return () => document.removeEventListener('mousedown', close); }, []);
+    const markRead = async notification => { if (!notification.read_at) { await notificationService.markRead(notification.id); await load(); } };
+    const markAll = async () => { await notificationService.markAllRead(); await load(); };
+ return <div className="relative" ref={ref}><button type="button" aria-label={`Notifikasi, ${unread} belum dibaca`} aria-expanded={open} onClick={() => setOpen(v => !v)} className="relative p-2 rounded-xl text-white/70 hover:text-white hover:bg-white/10 border border-white/10"><svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6 6 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" /></svg>{unread > 0 && <span className="absolute -top-1 -right-1 min-w-5 h-5 px-1 rounded-full bg-rose-500 text-white text-[10px] flex items-center justify-center">{unread > 99 ? '99+' : unread}</span>}</button>{open && <div className="app-popover absolute right-0 mt-2 w-[min(22rem,calc(100vw-2rem))] max-h-96 overflow-y-auto rounded-2xl z-50"><div className="sticky top-0 bg-slate-950/85 backdrop-blur-xl flex items-center justify-between p-3 border-b border-white/10"><h2 className="text-sm font-bold">Notifikasi</h2>{unread > 0 && <button type="button" onClick={markAll} className="text-xs text-cyan-300">Tandai semua dibaca</button>}</div>{notifications.length ? notifications.map(n => <button type="button" key={n.id} onClick={() => markRead(n)} className={`w-full text-left p-3 border-b border-white/5 hover:bg-white/5 ${n.read_at ? 'text-white/50' : 'text-white bg-primary-500/10'}`}><p className="text-xs font-semibold">{n.data?.title || n.title || n.judul || 'Notifikasi'}</p><p className="text-xs mt-1 opacity-70">{n.data?.message || n.message || n.pesan || ''}</p><time className="text-[10px] opacity-40 mt-1 block">{n.created_at ? new Date(n.created_at).toLocaleString('id-ID') : ''}</time></button>) : <p className="p-6 text-center text-xs text-white/40">Belum ada notifikasi.</p>}</div>}</div>;
+}

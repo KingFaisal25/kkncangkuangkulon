@@ -1,13 +1,11 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 
-const STEPS = ['FACE_FRONT', 'FACE_RIGHT', 'FACE_LEFT'];
-const STEP_TIMEOUT = 15000; // 15 seconds per step
+const STEPS = ['FACE_FRONT', 'BLINK'];
+const STEP_TIMEOUT = 10000; // 10 seconds per step
 
 const STEP_INFO = {
   IDLE: { label: 'Siap memulai...', instruction: 'Posisikan wajah Anda di dalam lingkaran' },
   FACE_FRONT: { label: 'Hadap Depan', instruction: 'Hadapkan wajah Anda ke depan kamera' },
-  FACE_RIGHT: { label: 'Tengok Kanan', instruction: 'Putar kepala Anda ke kanan' },
-  FACE_LEFT: { label: 'Tengok Kiri', instruction: 'Putar kepala Anda ke kiri' },
   BLINK: { label: 'Kedipkan Mata', instruction: 'Kedipkan kedua mata Anda' },
   COMPLETED: { label: 'Selesai!', instruction: 'Verifikasi liveness berhasil' },
   FAILED: { label: 'Gagal', instruction: 'Waktu habis, silakan coba lagi' },
@@ -95,14 +93,7 @@ export default function useLiveness(landmarks, blendshapes, faceDetected) {
 
     switch (step) {
       case 'FACE_FRONT':
-        conditionMet = Math.abs(yaw) < 12;
-        break;
-      case 'FACE_RIGHT':
-        // Because camera is mirrored, turning right = negative yaw in our calculation
-        conditionMet = yaw < -20;
-        break;
-      case 'FACE_LEFT':
-        conditionMet = yaw > 20;
+        conditionMet = Math.abs(yaw) < 18;
         break;
       case 'BLINK':
         if (blendshapes) {
@@ -119,7 +110,7 @@ export default function useLiveness(landmarks, blendshapes, faceDetected) {
       }
 
       const holdDuration = Date.now() - holdStartRef.current;
-      const required = step === 'BLINK' ? 200 : step === 'FACE_FRONT' ? 1000 : 500;
+      const required = step === 'BLINK' ? 150 : 700;
       setStepProgress(Math.min((holdDuration / required) * 100, 100));
 
       if (holdDuration >= required) {

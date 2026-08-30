@@ -22,7 +22,7 @@ class AuthController extends Controller
                 'nim' => 'required|string|max:50|unique:users,nim',
                 'jurusan' => 'required|string|max:255',
                 'password' => 'required|string|min:6',
-                'foto_registrasi' => 'required|string',
+                'foto_registrasi' => 'required|string|max:200000',
                 'face_embedding' => 'required|array|size:128',
                 'face_embedding.*' => 'required|numeric',
             ], [

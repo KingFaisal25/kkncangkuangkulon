@@ -1,5 +1,4 @@
 import { useState, useEffect, useRef } from 'react';
-import { Link } from 'react-router';
 import { useAuth } from '../context/AuthContext';
 import divisionService from '../services/divisionService';
 import { CardSkeleton } from '../components/ui/LoadingSpinner';

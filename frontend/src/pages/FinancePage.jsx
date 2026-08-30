@@ -1,391 +1,63 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
 import financeService from '../services/financeService';
 import rabService from '../services/rabService';
-import divisionService from '../services/divisionService';
 import { CardSkeleton } from '../components/ui/LoadingSpinner';
 
 const fmt = (n) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(n || 0);
+const inputClass = 'w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white placeholder-white/30 focus:outline-none focus:border-accent-cyan/50';
+const emptyForm = { nama_item: '', satuan: 'pcs', volume: 1, harga_satuan: '', deskripsi_kegiatan: '', keterangan: '', lampiran: null };
+const statusLabel = { pending: 'Menunggu Persetujuan', approved: 'Disetujui', rejected: 'Ditolak' };
+const statusClass = { pending: 'bg-amber-500/15 text-amber-300 border-amber-500/30', approved: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30', rejected: 'bg-rose-500/15 text-rose-300 border-rose-500/30' };
 
-function SummaryCard({ label, value, color, icon }) {
-    return (
-        <div className={`glass-card p-5 border ${color.border}`}>
-            <div className="flex items-center gap-3 mb-1">
-                <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${color.icon}`}>{icon}</div>
-                <p className="text-xs text-white/50">{label}</p>
-            </div>
-            <p className={`font-heading text-xl font-extrabold font-mono ${color.text}`}>{value}</p>
-        </div>
-    );
-}
+function SummaryCard({ label, value, color }) { return <div className={`glass-card p-5 border ${color}`}><p className="text-xs text-white/50 mb-2">{label}</p><p className="font-heading text-xl font-extrabold font-mono">{value}</p></div>; }
 
 export default function FinancePage() {
-    const { user } = useAuth();
-    const [tab, setTab] = useState('transaksi'); // 'transaksi' | 'rab'
+    const { user, isAdmin } = useAuth();
+    const [tab, setTab] = useState('transaksi');
     const [finance, setFinance] = useState(null);
-    const [rab, setRab] = useState({ items: [], total_rab: 0 });
-    const [divisions, setDivisions] = useState([]);
+    const [rab, setRab] = useState({ data: [], summary: {} });
     const [loading, setLoading] = useState(true);
     const [showForm, setShowForm] = useState(false);
+    const [editing, setEditing] = useState(null);
+    const [form, setForm] = useState(emptyForm);
     const [submitting, setSubmitting] = useState(false);
+    const [statusFilter, setStatusFilter] = useState('');
+    const [search, setSearch] = useState('');
+    const [rejecting, setRejecting] = useState(null);
+    const [rejectNote, setRejectNote] = useState('');
+    const isBendahara = isAdmin || user?.division?.nama?.toLowerCase().includes('bendahara');
+    const userDivisionId = user?.division_id ?? user?.division?.id;
+    const divisionName = user?.division?.nama || '-';
 
-    // Transaction form
-    const [txForm, setTxForm] = useState({ jenis: 'pemasukan', judul: '', jumlah: '', keterangan: '', tanggal: new Date().toISOString().slice(0, 10) });
+    const loadFinance = useCallback(async () => { const res = await financeService.getAll().catch(() => null); setFinance(res?.data?.data || null); }, []);
+    const loadRab = useCallback(async (initial = false) => { const res = await rabService.getItems().catch(() => null); const payload = res?.data || {}; setRab({ data: payload.data || [], summary: payload.summary || {} }); if (initial) setLoading(false); }, []);
+    useEffect(() => { loadFinance(); loadRab(true); }, [loadFinance, loadRab]);
+    useEffect(() => { if (tab !== 'rab') return undefined; const timer = setInterval(() => loadRab(false), 15000); return () => clearInterval(timer); }, [tab, loadRab]);
 
-    // RAB form
-    const [rabForm, setRabForm] = useState({ division_id: '', nama_item: '', satuan: 'pcs', volume: 1, harga_satuan: '' });
-
-    const bendaharaDiv = divisions.find(d => d.nama && d.nama.toLowerCase().includes('bendahara'));
-    const isBendahara = user?.role === 'admin' ||
-                        (user?.division?.nama && user.division.nama.toLowerCase().includes('bendahara')) ||
-                        (bendaharaDiv && user?.division_id === bendaharaDiv.id);
-
-    useEffect(() => { loadAll(); }, []);
-
-    const loadAll = async () => {
-        try {
-            const [finRes, rabRes, divRes] = await Promise.all([
-                financeService.getAll().catch(() => null),
-                rabService.getItems().catch(() => null),
-                divisionService.getDivisions().catch(() => null),
-            ]);
-            setFinance(finRes?.data?.data || null);
-            setRab(rabRes?.data?.data || { items: [], total_rab: 0 });
-            setDivisions(divRes?.data?.data || []);
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const handleAddTransaction = async (e) => {
-        e.preventDefault();
-        setSubmitting(true);
-        try {
-            await financeService.addTransaction({ ...txForm, jumlah: parseFloat(txForm.jumlah) });
-            setTxForm({ jenis: 'pemasukan', judul: '', jumlah: '', keterangan: '', tanggal: new Date().toISOString().slice(0, 10) });
-            setShowForm(false);
-            await loadAll();
-        } catch (err) {
-            alert(err?.response?.data?.message || 'Gagal menyimpan transaksi');
-        } finally {
-            setSubmitting(false);
-        }
-    };
-
-    const handleDeleteTx = async (id) => {
-        if (!confirm('Hapus transaksi ini?')) return;
-        await financeService.deleteTransaction(id).catch(() => { });
-        await loadAll();
-    };
-
-    const handleAddRab = async (e) => {
-        e.preventDefault();
-        setSubmitting(true);
-        try {
-            await rabService.addItem({ ...rabForm, volume: +rabForm.volume, harga_satuan: +rabForm.harga_satuan });
-            setRabForm({ division_id: '', nama_item: '', satuan: 'pcs', volume: 1, harga_satuan: '' });
-            setShowForm(false);
-            await loadAll();
-        } catch (err) {
-            alert(err?.response?.data?.message || 'Gagal menyimpan item RAB');
-        } finally {
-            setSubmitting(false);
-        }
-    };
-
-    const handleDeleteRab = async (id) => {
-        if (!confirm('Hapus item RAB ini?')) return;
-        await rabService.deleteItem(id).catch(() => { });
-        await loadAll();
-    };
-
-    // CSV exports
-    const exportTxCSV = () => {
-        const rows = finance?.transactions?.map(t => [t.tanggal, t.jenis, t.judul, t.jumlah, t.keterangan || '', t.user?.nama || '-']) || [];
-        const csv = [['Tanggal', 'Jenis', 'Keterangan', 'Jumlah (Rp)', 'Catatan', 'Pencatat'], ...rows]
-            .map(r => r.map(v => `"${v}"`).join(',')).join('\n');
-        const blob = new Blob([csv], { type: 'text/csv' });
-        const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'keuangan-kkn.csv'; a.click();
-    };
-
-    const exportRabCSV = () => {
-        const rows = rab.items?.map(i => [i.division?.nama || '', i.nama_item, i.volume, i.satuan, i.harga_satuan, i.total, i.keterangan || '']) || [];
-        const csv = [['Divisi', 'Nama Item', 'Volume', 'Satuan', 'Harga Satuan (Rp)', 'Total (Rp)', 'Keterangan'], ...rows]
-            .map(r => r.map(v => `"${v}"`).join(',')).join('\n');
-        const blob = new Blob([csv], { type: 'text/csv' });
-        const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'rab-kkn.csv'; a.click();
-    };
-
+    const refresh = async () => { await Promise.all([loadFinance(), loadRab(false)]); };
+    const errorMessage = (err, fallback) => err?.response?.data?.message || Object.values(err?.response?.data?.errors || {})?.flat()?.[0] || fallback;
+    const openForm = (item = null) => { setEditing(item); setForm(item ? { nama_item: item.nama_item || '', satuan: item.satuan || 'pcs', volume: item.volume || 1, harga_satuan: item.harga_satuan || '', deskripsi_kegiatan: item.deskripsi_kegiatan || '', keterangan: item.keterangan || '', lampiran: null } : emptyForm); setShowForm(true); };
+    const handleRabSubmit = async (e) => { e.preventDefault(); const file = form.lampiran; if (file && (!['application/pdf', 'image/jpeg', 'image/png'].includes(file.type) || file.size > 5 * 1024 * 1024)) return alert('Lampiran harus PDF/JPG/JPEG/PNG dan maksimal 5MB.'); if (+form.volume <= 0 || +form.harga_satuan < 0) return alert('Volume harus lebih dari 0 dan harga tidak boleh negatif.'); setSubmitting(true); try { const data = { ...form, volume: +form.volume, harga_satuan: +form.harga_satuan }; if (editing) await rabService.updateItem(editing.id, data); else await rabService.addItem(data); setShowForm(false); setEditing(null); setForm(emptyForm); await refresh(); } catch (err) { alert(errorMessage(err, 'Gagal menyimpan pengajuan RAB')); } finally { setSubmitting(false); } };
+    const handleDelete = async (id) => { if (!confirm('Hapus pengajuan RAB ini?')) return; try { await rabService.deleteItem(id); await refresh(); } catch (err) { alert(errorMessage(err, 'Gagal menghapus pengajuan RAB')); } };
+    const review = async (id, status, note = '') => { try { await rabService.updateStatus(id, status, note); setRejecting(null); setRejectNote(''); await refresh(); } catch (err) { alert(errorMessage(err, 'Gagal memperbarui status RAB')); } };
     const summary = finance?.summary || {};
-    const transactions = finance?.transactions || [];
+    const items = rab.data.filter(i => (!statusFilter || i.status === statusFilter) && (!search || `${i.nama_item} ${i.deskripsi_kegiatan} ${i.division?.nama || i.division || ''}`.toLowerCase().includes(search.toLowerCase())));
+    const canEdit = (i) => {
+        const itemDivisionId = i.division_id ?? i.division?.id;
+        const sameDivision = userDivisionId != null && itemDivisionId != null && String(userDivisionId) === String(itemDivisionId);
+        return ['pending', 'rejected'].includes(i.status) && (isAdmin || (user?.role === 'peserta' && sameDivision));
+    };
+    const exportRabCSV = () => { const csv = [['Divisi', 'Item', 'Status', 'Total'], ...rab.data.map(i => [i.division?.nama || i.division || '', i.nama_item, statusLabel[i.status] || i.status, i.total])].map(r => r.map(v => `"${v}"`).join(',')).join('\n'); const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' })); a.download = 'rab-kkn.csv'; a.click(); };
 
-    const tabs = [
-        { key: 'transaksi', label: '💸 Transaksi' },
-        { key: 'rab', label: '📋 RAB' },
-    ];
-
-    return (
-        <div className="space-y-8 animate-fade-in-up print:text-black print:bg-white">
-            {/* Header */}
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                <div>
-                    <h1 className="font-heading text-2xl sm:text-3xl font-extrabold tracking-tight">
-                        💰 Keuangan <span className="gradient-text">KKN</span>
-                    </h1>
-                    <p className="text-white/50 text-sm mt-1">Saldo, transaksi, dan rencana anggaran biaya</p>
-                </div>
-                <div className="flex gap-2 flex-wrap print:hidden">
-                    <button onClick={tab === 'rab' ? exportRabCSV : exportTxCSV} className="flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-sm font-semibold hover:bg-emerald-500/30 transition-all">
-                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
-                        Export CSV
-                    </button>
-                    <button onClick={() => window.print()} className="flex items-center gap-2 px-4 py-2 rounded-xl bg-rose-500/20 border border-rose-500/40 text-rose-300 text-sm font-semibold hover:bg-rose-500/30 transition-all">
-                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
-                        Export PDF
-                    </button>
-                    {isBendahara && (
-                        <button onClick={() => setShowForm(true)} className="btn-primary px-4 py-2 text-sm font-semibold rounded-xl flex items-center gap-2">
-                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" /></svg>
-                            {tab === 'rab' ? 'Tambah RAB' : 'Tambah Transaksi'}
-                        </button>
-                    )}
-                </div>
-            </div>
-
-            {/* Summary Cards */}
-            {loading ? (
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4"><CardSkeleton /><CardSkeleton /><CardSkeleton /></div>
-            ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                    <SummaryCard label="Saldo Kas" value={fmt(summary.saldo)} color={{ border: 'border-emerald-500/30', icon: 'bg-emerald-500/15 text-emerald-400', text: 'text-emerald-400' }}
-                        icon={<svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>}
-                    />
-                    <SummaryCard label="Total Pemasukan" value={fmt(summary.total_pemasukan)} color={{ border: 'border-sky-500/30', icon: 'bg-sky-500/15 text-sky-400', text: 'text-sky-400' }}
-                        icon={<svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M7 11l5-5m0 0l5 5m-5-5v12" /></svg>}
-                    />
-                    <SummaryCard label="Total Pengeluaran" value={fmt(summary.total_pengeluaran)} color={{ border: 'border-rose-500/30', icon: 'bg-rose-500/15 text-rose-400', text: 'text-rose-400' }}
-                        icon={<svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M17 13l-5 5m0 0l-5-5m5 5V6" /></svg>}
-                    />
-                </div>
-            )}
-
-            {/* Tabs */}
-            <div className="flex gap-1 p-1 bg-white/5 border border-white/10 rounded-2xl w-fit print:hidden">
-                {tabs.map(t => (
-                    <button key={t.key} onClick={() => { setTab(t.key); setShowForm(false); }}
-                        className={`px-5 py-2 rounded-xl text-sm font-semibold transition-all duration-200 ${tab === t.key ? 'bg-primary-500/30 text-white border border-primary-400/40' : 'text-white/40 hover:text-white/70'}`}>
-                        {t.label}
-                    </button>
-                ))}
-            </div>
-
-            {/* Add Form */}
-            {showForm && isBendahara && (
-                <div className="glass-card p-6 border border-primary-400/30 animate-fade-in-up print:hidden">
-                    <h3 className="font-heading font-bold text-base mb-4 text-white">
-                        {tab === 'rab' ? '📋 Tambah Item RAB' : '💸 Tambah Transaksi'}
-                    </h3>
-                    {tab === 'transaksi' ? (
-                        <form onSubmit={handleAddTransaction} className="space-y-4">
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div>
-                                    <label className="text-xs text-white/50 mb-1.5 block">Jenis *</label>
-                                    <select value={txForm.jenis} onChange={e => setTxForm(f => ({ ...f, jenis: e.target.value }))}
-                                        className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-accent-cyan/50">
-                                        <option value="pemasukan">⬆️ Pemasukan</option>
-                                        <option value="pengeluaran">⬇️ Pengeluaran</option>
-                                    </select>
-                                </div>
-                                <div>
-                                    <label className="text-xs text-white/50 mb-1.5 block">Tanggal *</label>
-                                    <input type="date" value={txForm.tanggal} onChange={e => setTxForm(f => ({ ...f, tanggal: e.target.value }))}
-                                        className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-accent-cyan/50" required />
-                                </div>
-                            </div>
-                            <div>
-                                <label className="text-xs text-white/50 mb-1.5 block">Keterangan *</label>
-                                <input type="text" value={txForm.judul} onChange={e => setTxForm(f => ({ ...f, judul: e.target.value }))}
-                                    placeholder="Contoh: Dana dari BNI, Beli ATK, dll." required
-                                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white placeholder-white/30 focus:outline-none focus:border-accent-cyan/50" />
-                            </div>
-                            <div>
-                                <label className="text-xs text-white/50 mb-1.5 block">Jumlah (Rp) *</label>
-                                <input type="number" value={txForm.jumlah} onChange={e => setTxForm(f => ({ ...f, jumlah: e.target.value }))}
-                                    placeholder="0" min="0" required
-                                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white placeholder-white/30 focus:outline-none focus:border-accent-cyan/50 font-mono" />
-                            </div>
-                            <div>
-                                <label className="text-xs text-white/50 mb-1.5 block">Catatan tambahan</label>
-                                <textarea value={txForm.keterangan} onChange={e => setTxForm(f => ({ ...f, keterangan: e.target.value }))} rows={2}
-                                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white placeholder-white/30 focus:outline-none focus:border-accent-cyan/50 resize-none" />
-                            </div>
-                            <div className="flex gap-3 justify-end pt-2">
-                                <button type="button" onClick={() => setShowForm(false)} className="px-5 py-2.5 rounded-xl border border-white/10 text-sm text-white/60 hover:text-white transition-all">Batal</button>
-                                <button type="submit" disabled={submitting} className="btn-primary px-6 py-2.5 text-sm font-semibold rounded-xl disabled:opacity-50">{submitting ? 'Menyimpan...' : '✓ Simpan'}</button>
-                            </div>
-                        </form>
-                    ) : (
-                        <form onSubmit={handleAddRab} className="space-y-4">
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div>
-                                    <label className="text-xs text-white/50 mb-1.5 block">Divisi *</label>
-                                    <select value={rabForm.division_id} onChange={e => setRabForm(f => ({ ...f, division_id: e.target.value }))}
-                                        className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-accent-cyan/50" required>
-                                        <option value="">Pilih Divisi</option>
-                                        {divisions.map(d => <option key={d.id} value={d.id}>{d.nama}</option>)}
-                                    </select>
-                                </div>
-                                <div>
-                                    <label className="text-xs text-white/50 mb-1.5 block">Nama Item *</label>
-                                    <input type="text" value={rabForm.nama_item} onChange={e => setRabForm(f => ({ ...f, nama_item: e.target.value }))} placeholder="Contoh: Spanduk, ATK, dll." required
-                                        className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white placeholder-white/30 focus:outline-none focus:border-accent-cyan/50" />
-                                </div>
-                                <div>
-                                    <label className="text-xs text-white/50 mb-1.5 block">Volume *</label>
-                                    <input type="number" value={rabForm.volume} onChange={e => setRabForm(f => ({ ...f, volume: e.target.value }))} min="0" step="0.01" required
-                                        className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-accent-cyan/50 font-mono" />
-                                </div>
-                                <div>
-                                    <label className="text-xs text-white/50 mb-1.5 block">Satuan *</label>
-                                    <input type="text" value={rabForm.satuan} onChange={e => setRabForm(f => ({ ...f, satuan: e.target.value }))} placeholder="pcs, meter, kg, dll." required
-                                        className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white placeholder-white/30 focus:outline-none focus:border-accent-cyan/50" />
-                                </div>
-                                <div className="md:col-span-2">
-                                    <label className="text-xs text-white/50 mb-1.5 block">Harga Satuan (Rp) *</label>
-                                    <input type="number" value={rabForm.harga_satuan} onChange={e => setRabForm(f => ({ ...f, harga_satuan: e.target.value }))} placeholder="0" min="0" required
-                                        className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white placeholder-white/30 focus:outline-none focus:border-accent-cyan/50 font-mono" />
-                                    {rabForm.volume && rabForm.harga_satuan && (
-                                        <p className="text-xs text-accent-cyan mt-1">Total: {fmt(+rabForm.volume * +rabForm.harga_satuan)}</p>
-                                    )}
-                                </div>
-                            </div>
-                            <div className="flex gap-3 justify-end pt-2">
-                                <button type="button" onClick={() => setShowForm(false)} className="px-5 py-2.5 rounded-xl border border-white/10 text-sm text-white/60 hover:text-white transition-all">Batal</button>
-                                <button type="submit" disabled={submitting} className="btn-primary px-6 py-2.5 text-sm font-semibold rounded-xl disabled:opacity-50">{submitting ? 'Menyimpan...' : '✓ Simpan'}</button>
-                            </div>
-                        </form>
-                    )}
-                </div>
-            )}
-
-            {/* Transaction Tab */}
-            {tab === 'transaksi' && (
-                loading ? <CardSkeleton /> : (
-                    transactions.length === 0 ? (
-                        <div className="glass-card-static p-10 text-center border border-white/5">
-                            <p className="text-white/30 text-sm">Belum ada transaksi. {isBendahara ? 'Klik "+ Tambah Transaksi" untuk memulai.' : ''}</p>
-                        </div>
-                    ) : (
-                        <div className="glass-card-static overflow-hidden border border-white/5">
-                            <div className="overflow-x-auto">
-                                <table className="w-full text-sm">
-                                    <thead>
-                                        <tr className="text-xs text-white/30 uppercase tracking-wider border-b border-white/5">
-                                            <th className="text-left px-5 py-3">Tanggal</th>
-                                            <th className="text-left px-5 py-3">Keterangan</th>
-                                            <th className="text-left px-5 py-3">Jenis</th>
-                                            <th className="text-right px-5 py-3">Jumlah</th>
-                                            <th className="text-left px-5 py-3">Pencatat</th>
-                                            {isBendahara && <th className="px-5 py-3 print:hidden" />}
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-white/5">
-                                        {transactions.map(t => (
-                                            <tr key={t.id} className="hover:bg-white/[0.02] transition-colors">
-                                                <td className="px-5 py-3.5 text-white/50 font-mono text-xs">{t.tanggal}</td>
-                                                <td className="px-5 py-3.5">
-                                                    <p className="text-white font-medium">{t.judul}</p>
-                                                    {t.keterangan && <p className="text-xs text-white/30 mt-0.5">{t.keterangan}</p>}
-                                                </td>
-                                                <td className="px-5 py-3.5">
-                                                    <span className={`px-2.5 py-1 rounded-full text-xs font-bold border ${t.jenis === 'pemasukan' ? 'bg-sky-500/20 text-sky-300 border-sky-500/30' : 'bg-rose-500/20 text-rose-300 border-rose-500/30'}`}>
-                                                        {t.jenis === 'pemasukan' ? '⬆ Masuk' : '⬇ Keluar'}
-                                                    </span>
-                                                </td>
-                                                <td className={`px-5 py-3.5 text-right font-mono font-bold ${t.jenis === 'pemasukan' ? 'text-sky-300' : 'text-rose-300'}`}>
-                                                    {t.jenis === 'pemasukan' ? '+' : '-'}{fmt(t.jumlah)}
-                                                </td>
-                                                <td className="px-5 py-3.5 text-white/40 text-xs">{t.user?.nama || '-'}</td>
-                                                {isBendahara && (
-                                                    <td className="px-5 py-3.5 print:hidden">
-                                                        <button onClick={() => handleDeleteTx(t.id)} className="text-rose-400 hover:text-rose-300 text-xs transition-colors">Hapus</button>
-                                                    </td>
-                                                )}
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                    <tfoot className="border-t border-white/10">
-                                        <tr className="bg-white/[0.02]">
-                                            <td colSpan={3} className="px-5 py-3 text-sm font-bold text-white/50">Saldo Akhir</td>
-                                            <td className={`px-5 py-3 text-right font-mono font-extrabold text-lg ${(summary.saldo || 0) >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-                                                {fmt(summary.saldo)}
-                                            </td>
-                                            <td colSpan={isBendahara ? 2 : 1} />
-                                        </tr>
-                                    </tfoot>
-                                </table>
-                            </div>
-                        </div>
-                    )
-                )
-            )}
-
-            {/* RAB Tab */}
-            {tab === 'rab' && (
-                loading ? <CardSkeleton /> : (
-                    rab.items?.length === 0 ? (
-                        <div className="glass-card-static p-10 text-center border border-white/5">
-                            <p className="text-white/30 text-sm">Belum ada item RAB. {isBendahara ? 'Klik "+ Tambah RAB" untuk memulai.' : ''}</p>
-                        </div>
-                    ) : (
-                        <div className="glass-card-static overflow-hidden border border-white/5">
-                            <div className="overflow-x-auto">
-                                <table className="w-full text-sm">
-                                    <thead>
-                                        <tr className="text-xs text-white/30 uppercase tracking-wider border-b border-white/5">
-                                            <th className="text-left px-5 py-3">Divisi</th>
-                                            <th className="text-left px-5 py-3">Nama Item</th>
-                                            <th className="text-right px-5 py-3">Volume</th>
-                                            <th className="text-left px-5 py-3">Satuan</th>
-                                            <th className="text-right px-5 py-3">Harga Satuan</th>
-                                            <th className="text-right px-5 py-3">Total</th>
-                                            {isBendahara && <th className="px-5 py-3 print:hidden" />}
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-white/5">
-                                        {rab.items?.map(i => (
-                                            <tr key={i.id} className="hover:bg-white/[0.02] transition-colors">
-                                                <td className="px-5 py-3.5">
-                                                    <span className="px-2 py-0.5 rounded-lg text-xs font-bold border" style={{ background: `${i.division?.warna}20`, color: i.division?.warna, borderColor: `${i.division?.warna}40` }}>
-                                                        {i.division?.nama || '-'}
-                                                    </span>
-                                                </td>
-                                                <td className="px-5 py-3.5 text-white font-medium">{i.nama_item}</td>
-                                                <td className="px-5 py-3.5 text-right text-white/60 font-mono">{i.volume}</td>
-                                                <td className="px-5 py-3.5 text-white/60">{i.satuan}</td>
-                                                <td className="px-5 py-3.5 text-right font-mono text-white/60">{fmt(i.harga_satuan)}</td>
-                                                <td className="px-5 py-3.5 text-right font-mono font-bold text-accent-cyan">{fmt(i.total)}</td>
-                                                {isBendahara && (
-                                                    <td className="px-5 py-3.5 print:hidden">
-                                                        <button onClick={() => handleDeleteRab(i.id)} className="text-rose-400 hover:text-rose-300 text-xs transition-colors">Hapus</button>
-                                                    </td>
-                                                )}
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                    <tfoot className="border-t border-white/10">
-                                        <tr className="bg-white/[0.02]">
-                                            <td colSpan={5} className="px-5 py-3 text-sm font-bold text-white/50">Total Anggaran RAB</td>
-                                            <td className="px-5 py-3 text-right font-mono font-extrabold text-lg text-amber-400">{fmt(rab.total_rab)}</td>
-                                            {isBendahara && <td />}
-                                        </tr>
-                                    </tfoot>
-                                </table>
-                            </div>
-                        </div>
-                    )
-                )
-            )}
-        </div>
-    );
+    return <div className="space-y-8 animate-fade-in-up print:text-black print:bg-white">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4"><div><h1 className="font-heading text-2xl sm:text-3xl font-extrabold tracking-tight">Keuangan <span className="gradient-text">KKN</span></h1><p className="text-white/50 text-sm mt-1">Saldo, transaksi, dan workflow RAB</p></div><div className="flex gap-2 flex-wrap print:hidden"><button type="button" onClick={tab === 'rab' ? exportRabCSV : () => window.print()} className="px-4 py-2 rounded-xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-sm font-semibold">{tab === 'rab' ? 'Export CSV' : 'Export PDF'}</button>{tab === 'rab' && user?.role === 'peserta' && userDivisionId != null && <button type="button" onClick={() => openForm()} className="btn-primary px-4 py-2 text-sm font-semibold rounded-xl">Ajukan RAB</button>}</div></div>
+        {loading ? <div className="grid grid-cols-1 sm:grid-cols-3 gap-4"><CardSkeleton /><CardSkeleton /><CardSkeleton /></div> : <div className="grid grid-cols-1 sm:grid-cols-3 gap-4"><SummaryCard label="Saldo Kas" value={fmt(summary.saldo)} color="border-emerald-500/30" /><SummaryCard label="Total Pemasukan" value={fmt(summary.total_pemasukan)} color="border-sky-500/30" /><SummaryCard label="Total Pengeluaran" value={fmt(summary.total_pengeluaran)} color="border-rose-500/30" /></div>}
+        <div className="flex gap-1 p-1 bg-white/5 border border-white/10 rounded-2xl w-fit print:hidden"><button type="button" onClick={() => setTab('transaksi')} className={`px-5 py-2 rounded-xl text-sm font-semibold ${tab === 'transaksi' ? 'bg-primary-500/30 text-white' : 'text-white/40'}`}>Transaksi</button><button type="button" onClick={() => setTab('rab')} className={`px-5 py-2 rounded-xl text-sm font-semibold ${tab === 'rab' ? 'bg-primary-500/30 text-white' : 'text-white/40'}`}>RAB</button></div>
+        {showForm && tab === 'rab' && <div className="glass-card p-6 border border-primary-400/30 print:hidden"><h2 className="font-heading font-bold mb-4">{editing ? 'Edit Pengajuan RAB' : 'Ajukan RAB'} <span className="text-xs text-white/40 font-normal">Divisi: {divisionName}</span></h2><form onSubmit={handleRabSubmit} className="space-y-4"><div className="grid grid-cols-1 md:grid-cols-2 gap-4">{[['nama_item','Nama kebutuhan','text'],['volume','Volume','number'],['satuan','Satuan','text'],['harga_satuan','Harga satuan (Rp)','number']].map(([key,label,type]) => <div key={key}><label htmlFor={`rab-${key}`} className="text-xs text-white/50 mb-1.5 block">{label} *</label><input id={`rab-${key}`} type={type} value={form[key]} min={type === 'number' ? '0' : undefined} step={key === 'volume' ? '0.01' : undefined} onChange={e => setForm(f => ({ ...f, [key]: e.target.value }))} className={inputClass} required /></div>)}<div className="md:col-span-2"><label htmlFor="rab-deskripsi" className="text-xs text-white/50 mb-1.5 block">Deskripsi kegiatan *</label><textarea id="rab-deskripsi" value={form.deskripsi_kegiatan} onChange={e => setForm(f => ({ ...f, deskripsi_kegiatan: e.target.value }))} className={inputClass} rows="2" required /></div><div className="md:col-span-2"><label htmlFor="rab-keterangan" className="text-xs text-white/50 mb-1.5 block">Keterangan</label><textarea id="rab-keterangan" value={form.keterangan} onChange={e => setForm(f => ({ ...f, keterangan: e.target.value }))} className={inputClass} rows="2" /></div><div className="md:col-span-2"><label htmlFor="rab-lampiran" className="text-xs text-white/50 mb-1.5 block">Lampiran</label><input id="rab-lampiran" type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={e => setForm(f => ({ ...f, lampiran: e.target.files[0] || null }))} className="text-sm text-white/60" /><p className="text-xs text-white/30 mt-1">PDF/JPG/JPEG/PNG, maksimal 5MB</p></div></div><div className="flex gap-3 justify-end"><button type="button" onClick={() => setShowForm(false)} className="px-5 py-2.5 rounded-xl border border-white/10 text-sm text-white/60">Batal</button><button type="submit" disabled={submitting} className="btn-primary px-6 py-2.5 text-sm font-semibold rounded-xl disabled:opacity-50">{submitting ? 'Menyimpan...' : 'Simpan Pengajuan'}</button></div></form></div>}
+        {tab === 'transaksi' ? <TransactionList finance={finance} isBendahara={isBendahara} summary={summary} onDelete={async id => { if (confirm('Hapus transaksi ini?')) { await financeService.deleteTransaction(id).catch(() => {}); await refresh(); } }} /> : <div className="space-y-4"><div className="grid grid-cols-2 md:grid-cols-4 gap-3"><SummaryCard label="Menunggu" value={rab.summary.pending_count || 0} color="border-amber-500/30" /><SummaryCard label="Disetujui" value={rab.summary.approved_count || 0} color="border-emerald-500/30" /><SummaryCard label="Ditolak" value={rab.summary.rejected_count || 0} color="border-rose-500/30" /><SummaryCard label="Total nominal" value={fmt(rab.summary.total_amount)} color="border-cyan-500/30" /></div><div className="flex flex-col sm:flex-row gap-2"><input aria-label="Cari pengajuan RAB" placeholder="Cari item atau deskripsi" value={search} onChange={e => setSearch(e.target.value)} className={inputClass} /><select aria-label="Filter status" value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className={inputClass}><option value="">Semua status</option><option value="pending">Menunggu Persetujuan</option><option value="approved">Disetujui</option><option value="rejected">Ditolak</option></select></div><div className="glass-card-static overflow-hidden border border-white/5"><div className="overflow-x-auto"><table className="w-full text-sm"><thead><tr className="text-xs text-white/30 uppercase border-b border-white/5"><th className="text-left px-4 py-3">Pengajuan</th><th className="text-left px-4 py-3">Divisi</th><th className="text-left px-4 py-3">Status</th><th className="text-right px-4 py-3">Total</th><th className="text-left px-4 py-3">Reviewer/Catatan</th><th className="px-4 py-3" /></tr></thead><tbody className="divide-y divide-white/5">{items.map(i => <tr key={i.id}><td className="px-4 py-4"><p className="font-medium text-white">{i.nama_item}</p><p className="text-xs text-white/50">{i.volume} {i.satuan} × {fmt(i.harga_satuan)}</p><p className="text-xs text-white/40 mt-1">{i.deskripsi_kegiatan}</p>{i.attachment_url && <a href={i.attachment_url} target="_blank" rel="noreferrer" className="text-xs text-cyan-300 underline">Lihat lampiran</a>}</td><td className="px-4 py-4 text-white/60">{i.division?.nama || i.division || divisionName}</td><td className="px-4 py-4"><span className={`px-2 py-1 rounded-full text-xs font-bold border ${statusClass[i.status]}`}>{statusLabel[i.status] || i.status}</span></td><td className="px-4 py-4 text-right font-mono font-bold text-cyan-300">{fmt(i.total || i.volume * i.harga_satuan)}</td><td className="px-4 py-4 text-xs text-white/50">{i.reviewer?.nama || '-'}{i.rejection_note && <p className="text-rose-300 mt-1">{i.rejection_note}</p>}</td><td className="px-4 py-4"><div className="flex flex-wrap gap-2">{canEdit(i) && <><button type="button" onClick={() => openForm(i)} className="text-cyan-300 text-xs">Edit</button><button type="button" onClick={() => handleDelete(i.id)} className="text-rose-300 text-xs">Hapus</button></>}{isBendahara && i.status === 'pending' && <><button type="button" onClick={() => review(i.id, 'approved')} className="text-emerald-300 text-xs">Setujui</button><button type="button" onClick={() => setRejecting(i)} className="text-rose-300 text-xs">Tolak</button></>}</div></td></tr>)}</tbody></table>{items.length === 0 && <p className="p-8 text-center text-white/40 text-sm">Belum ada pengajuan RAB.</p>}</div></div></div>}
+        {rejecting && <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4"><div className="glass-card p-6 w-full max-w-md"><h2 className="font-heading font-bold mb-3">Catatan penolakan</h2><label htmlFor="reject-note" className="text-xs text-white/50">Alasan wajib diisi</label><textarea id="reject-note" value={rejectNote} onChange={e => setRejectNote(e.target.value)} className={`${inputClass} mt-2`} rows="4" required /><div className="flex justify-end gap-2 mt-4"><button type="button" onClick={() => setRejecting(null)} className="px-4 py-2 text-sm text-white/60">Batal</button><button type="button" disabled={!rejectNote.trim()} onClick={() => review(rejecting.id, 'rejected', rejectNote.trim())} className="btn-primary px-4 py-2 text-sm disabled:opacity-50">Tolak</button></div></div></div>}
+    </div>;
 }
+
+function TransactionList({ finance, isBendahara, onDelete }) { const transactions = finance?.transactions || []; return <div className="glass-card-static overflow-hidden border border-white/5"><div className="overflow-x-auto"><table className="w-full text-sm"><thead><tr className="text-xs text-white/30 uppercase border-b border-white/5"><th className="text-left px-5 py-3">Tanggal</th><th className="text-left px-5 py-3">Keterangan</th><th className="text-left px-5 py-3">Jenis</th><th className="text-right px-5 py-3">Jumlah</th><th className="text-left px-5 py-3">Pencatat</th><th /></tr></thead><tbody className="divide-y divide-white/5">{transactions.map(t => <tr key={t.id}><td className="px-5 py-3 text-white/50">{t.tanggal}</td><td className="px-5 py-3 text-white">{t.judul}</td><td className="px-5 py-3 text-white/60">{t.jenis}</td><td className="px-5 py-3 text-right font-mono">{fmt(t.jumlah)}</td><td className="px-5 py-3 text-white/40">{t.user?.nama || '-'}</td>{isBendahara && <td className="px-5 py-3"><button type="button" onClick={() => onDelete(t.id)} className="text-rose-300 text-xs">Hapus</button></td>}</tr>)}</tbody></table>{!transactions.length && <p className="p-8 text-center text-white/40 text-sm">Belum ada transaksi.</p>}</div></div>; }

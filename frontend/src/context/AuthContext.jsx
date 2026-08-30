@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 import { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import authService from '../services/authService';
 
@@ -9,25 +10,20 @@ export function AuthProvider({ children }) {
   const [token, setToken] = useState(() => localStorage.getItem(getTokenKey()));
   const [loading, setLoading] = useState(true);
 
-  // Load user on mount if token exists
   useEffect(() => {
-    if (token) {
-      authService
-        .getUser()
-        .then((data) => {
-          setUser(data.data?.user || data.user || data);
-        })
-        .catch(() => {
-          // Token invalid
-          localStorage.removeItem(getTokenKey());
-          localStorage.removeItem('user'); // if used
-          setToken(null);
-          setUser(null);
-        })
-        .finally(() => setLoading(false));
-    } else {
+    if (!token) {
       setLoading(false);
+      return;
     }
+    authService.getUser()
+      .then((data) => setUser(data.data?.user || data.user || data))
+      .catch(() => {
+        localStorage.removeItem(getTokenKey());
+        localStorage.removeItem('user');
+        setToken(null);
+        setUser(null);
+      })
+      .finally(() => setLoading(false));
   }, [token]);
 
   const login = useCallback(async (nim, password) => {
@@ -48,38 +44,16 @@ export function AuthProvider({ children }) {
     return response;
   }, []);
 
-  const register = useCallback(async (formData) => {
-    const response = await authService.register(formData);
-    // Tidak auto-login sesuai request
-    return response;
-  }, []);
-
+  const register = useCallback((formData) => authService.register(formData), []);
   const logout = useCallback(async () => {
-    try {
-      await authService.logout();
-    } catch {
-      // ignore
-    }
+    try { await authService.logout(); } catch { /* ignore */ }
     localStorage.removeItem(getTokenKey());
     localStorage.removeItem('user');
     setToken(null);
     setUser(null);
   }, []);
 
-  const value = useMemo(
-    () => ({
-      user,
-      token,
-      loading,
-      login,
-      adminLogin,
-      register,
-      logout,
-      isAuthenticated: !!token && !!user,
-      isAdmin: user?.role === 'admin' || user?.is_admin === true,
-    }),
-    [user, token, loading, login, adminLogin, register, logout]
-  );
+  const value = useMemo(() => ({ user, token, loading, login, adminLogin, register, logout, isAuthenticated: !!token && !!user, isAdmin: user?.role === 'admin' || user?.is_admin === true }), [user, token, loading, login, adminLogin, register, logout]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

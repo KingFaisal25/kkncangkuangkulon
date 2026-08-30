@@ -6,11 +6,10 @@ import attendanceService from '../services/attendanceService';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import LivenessChallenge from '../components/camera/LivenessChallenge';
-import FaceCapture from '../components/camera/FaceCapture';
+import useFaceRecognition from '../hooks/useFaceRecognition';
 
 const AttendancePage = () => {
   const [step, setStep] = useState(1); // 1: Info, 2: Liveness, 3: Capture, 4: Loading, 5: Result
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [result, setResult] = useState(null);
   const [todayAttendance, setTodayAttendance] = useState(null);
@@ -19,7 +18,8 @@ const AttendancePage = () => {
   const [activityId, setActivityId] = useState('');
 
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { generateEmbedding } = useFaceRecognition();
+  useAuth();
 
   useEffect(() => {
     const checkToday = async () => {
@@ -39,16 +39,12 @@ const AttendancePage = () => {
     checkToday();
   }, []);
 
-  const handleLivenessComplete = () => {
-    setStep(3); // Proceed to face capture
-  };
-
-  const handleCapture = async ({ imageBase64, embedding }) => {
+  const handleLivenessComplete = async ({ imageBase64 }) => {
     setStep(4); // Loading
-    setLoading(true);
     setError(null);
 
     try {
+      const embedding = await generateEmbedding(imageBase64);
       const response = await attendanceService.submitAttendance({
         activity_id: Number(activityId),
         foto_absen: imageBase64,
@@ -66,8 +62,6 @@ const AttendancePage = () => {
       console.error('Attendance error:', err);
       setError(err.response?.data?.message || err.message || 'Terjadi kesalahan saat absensi.');
       setStep(1);
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -148,17 +142,6 @@ const AttendancePage = () => {
             <Button onClick={() => setStep(1)} variant="ghost" size="sm">Batal</Button>
           </div>
           <LivenessChallenge onComplete={handleLivenessComplete} />
-        </div>
-      )}
-
-      {step === 3 && (
-        <div className="flex-1 flex flex-col">
-          <div className="mb-4 flex justify-between items-center">
-            <h2 className="text-2xl font-heading text-white">Face Recognition</h2>
-            <Button onClick={() => setStep(1)} variant="ghost" size="sm">Batal</Button>
-          </div>
-          <p className="text-primary-200 mb-4 text-center">Tatap kamera dengan jelas untuk proses pencocokan wajah.</p>
-          <FaceCapture onCapture={handleCapture} autoCapture={true} />
         </div>
       )}
 

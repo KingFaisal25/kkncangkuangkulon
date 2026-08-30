@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { Link, useLocation, Outlet, useNavigate } from 'react-router';
+import { Link, useLocation, useNavigate } from 'react-router';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import PageTransition from './PageTransition';
+import NotificationMenu from './NotificationMenu';
 
 const sidebarLinks = [
   {
@@ -96,7 +97,7 @@ export default function AdminLayout({ children }) {
 
       {/* Sidebar */}
       <aside
-        className={`fixed md:sticky top-0 left-0 z-50 h-screen w-64 glass-card-static border-r border-white/5 rounded-none flex flex-col transition-transform duration-300 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
+        className={`admin-sidebar fixed md:sticky top-0 left-0 z-50 h-screen w-64 rounded-none flex flex-col transition-transform duration-300 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
           }`}
       >
         {/* Brand */}
@@ -137,6 +138,7 @@ export default function AdminLayout({ children }) {
 
         {/* User section */}
         <div className="p-4 border-t border-white/5">
+          <div className="hidden md:flex justify-end mb-3"><NotificationMenu /></div>
           <div className="flex items-center gap-3 mb-3">
             <div className="w-9 h-9 rounded-full bg-gradient-to-br from-primary-400 to-primary-600 flex items-center justify-center text-sm font-bold">
               {(user?.nama || 'A').charAt(0).toUpperCase()}
@@ -202,6 +204,7 @@ export default function AdminLayout({ children }) {
             </svg>
           </button>
           <h1 className="font-heading font-bold">Admin Panel</h1>
+          <NotificationMenu />
         </div>
 
         <main className="flex-1 p-4 sm:p-6 lg:p-8">

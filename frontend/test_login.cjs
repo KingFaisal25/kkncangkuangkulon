@@ -2,7 +2,7 @@ const axios = require('axios');
 
 async function test() {
   try {
-    const res = await axios.post('http://localhost:8000/api/admin/login', {
+    const res = await axios.post('https://kkncangkuangkulon.my.id/api_laravel/public/api/admin/login', {
       nim: 'admin',
       password: 'admin123'
     });

@@ -28,6 +28,9 @@ export default function useFaceDetection(videoRef, isActive) {
         },
         runningMode: 'VIDEO',
         numFaces: 1,
+        minFaceDetectionConfidence: 0.3,
+        minFacePresenceConfidence: 0.3,
+        minTrackingConfidence: 0.3,
         outputFaceBlendshapes: true,
         outputFacialTransformationMatrixes: false,
       });

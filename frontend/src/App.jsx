@@ -7,30 +7,39 @@ import PageTransition from './components/layout/PageTransition';
 import AdminLayout from './components/layout/AdminLayout';
 import Navbar from './components/layout/Navbar';
 import EffectsLayer from './components/layout/EffectsLayer';
+import LoadingSpinner from './components/ui/LoadingSpinner';
 
 // Pages
 const LoginPage = lazy(() => import('./pages/LoginPage'));
 const RegisterPage = lazy(() => import('./pages/RegisterPage'));
-import DashboardPage from './pages/DashboardPage';
+const DashboardPage = lazy(() => import('./pages/DashboardPage'));
 const AttendancePage = lazy(() => import('./pages/AttendancePage'));
-import HistoryPage from './pages/HistoryPage';
-import ActivitiesPage from './pages/ActivitiesPage';
-import AttendanceRequestsPage from './pages/AttendanceRequestsPage';
-import WorkProgramsPage from './pages/WorkProgramsPage';
+const HistoryPage = lazy(() => import('./pages/HistoryPage'));
+const ActivitiesPage = lazy(() => import('./pages/ActivitiesPage'));
+const AttendanceRequestsPage = lazy(() => import('./pages/AttendanceRequestsPage'));
+const WorkProgramsPage = lazy(() => import('./pages/WorkProgramsPage'));
 const ReportsPage = lazy(() => import('./pages/ReportsPage'));
-import NotFoundPage from './pages/NotFoundPage';
+const NotFoundPage = lazy(() => import('./pages/NotFoundPage'));
 const DivisionsPage = lazy(() => import('./pages/DivisionsPage'));
 const FinancePage = lazy(() => import('./pages/FinancePage'));
 
 // Admin Pages
 const AdminLoginPage = lazy(() => import('./pages/admin/AdminLoginPage'));
-import AdminDashboard from './pages/admin/AdminDashboard';
-import AdminUsers from './pages/admin/AdminUsers';
-import AdminAttendance from './pages/admin/AdminAttendance';
-import AdminActivities from './pages/admin/AdminActivities';
-import AdminAttendanceRequests from './pages/admin/AdminAttendanceRequests';
-import AdminWorkPrograms from './pages/admin/AdminWorkPrograms';
-import AdminDivisions from './pages/admin/AdminDivisions';
+const AdminDashboard = lazy(() => import('./pages/admin/AdminDashboard'));
+const AdminUsers = lazy(() => import('./pages/admin/AdminUsers'));
+const AdminAttendance = lazy(() => import('./pages/admin/AdminAttendance'));
+const AdminActivities = lazy(() => import('./pages/admin/AdminActivities'));
+const AdminAttendanceRequests = lazy(() => import('./pages/admin/AdminAttendanceRequests'));
+const AdminWorkPrograms = lazy(() => import('./pages/admin/AdminWorkPrograms'));
+const AdminDivisions = lazy(() => import('./pages/admin/AdminDivisions'));
+
+const AppLoading = () => (
+  <div className="app-loading min-h-screen flex items-center justify-center">
+    <div className="glass-card-static px-10 py-8 text-center">
+      <LoadingSpinner size="lg" text="Menyiapkan pengalaman KKN..." />
+    </div>
+  </div>
+);
 
 // Layout wrapper for participant routes to include Navbar
 const PesertaLayout = ({ children }) => (
@@ -51,7 +60,7 @@ function App() {
       <AuthProvider>
         <BrowserRouter>
           <EffectsLayer />
-          <Suspense fallback={<div className="flex justify-center items-center min-h-screen"><div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-500" /></div>}><Routes>
+          <Suspense fallback={<AppLoading />}><Routes>
             <Route path="/login" element={<PageTransition><LoginPage /></PageTransition>} />
             <Route path="/register" element={<PageTransition><RegisterPage /></PageTransition>} />
             <Route path="/admin/login" element={<PageTransition><AdminLoginPage /></PageTransition>} />

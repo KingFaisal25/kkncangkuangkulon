@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import Card from '../../components/ui/Card';
 import Badge from '../../components/ui/Badge';
 import Button from '../../components/ui/Button';
@@ -16,16 +16,7 @@ const AdminAttendance = () => {
     search: '', activity_id: ''
   });
 
-  useEffect(() => {
-    api.get('/admin/activities').then(({ data }) => setActivities(data.data.activities || []));
-    // Total peserta KKN (semua mahasiswa)
-    adminService.getUsers({ per_page: 1 }).then((res) => {
-      setTotalMahasiswa(res?.data?.total ?? res?.total ?? 0);
-    }).catch(() => {});
-    fetchRecords();
-  }, []);
-
-  const fetchRecords = async () => {
+  const fetchRecords = useCallback(async () => {
     try {
       setLoading(true);
       const res = await adminService.getAttendance({ ...filters, per_page: 1000 });
@@ -38,7 +29,16 @@ const AdminAttendance = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [filters]);
+
+  useEffect(() => {
+    api.get('/admin/activities').then(({ data }) => setActivities(data.data.activities || []));
+    // Total peserta KKN (semua mahasiswa)
+    adminService.getUsers({ per_page: 1 }).then((res) => {
+      setTotalMahasiswa(res?.data?.total ?? res?.total ?? 0);
+    }).catch(() => {});
+    fetchRecords();
+  }, [fetchRecords]);
 
   const handleExportExcel = () => adminService.exportExcel(filters);
   const handleExportPDF = () => window.print();
@@ -51,9 +51,22 @@ const AdminAttendance = () => {
   const stats = useMemo(() => {
     const hadir = records.filter(r => r.status === 'Hadir').length;
     const terlambat = records.filter(r => r.status === 'Terlambat').length;
+    const tidakHadir = records.filter(r => r.status === 'Tidak Hadir').length;
     const uniqueMhs = new Set(records.map(r => r.user?.id).filter(Boolean)).size;
-    return { total: records.length, hadir, terlambat, uniqueMhs };
+    return { total: records.length, hadir, terlambat, tidakHadir, uniqueMhs };
   }, [records]);
+
+  const activitySummary = useMemo(() => Object.values(records.reduce((acc, record) => {
+    const key = record.activity_id || record.activity?.id || 'tanpa-kegiatan';
+    if (!acc[key]) {
+      acc[key] = { activity: record.activity?.nama || '-', hadir: [], terlambat: [], tidakHadir: [], total: 0 };
+    }
+    acc[key].total += 1;
+    if (record.status === 'Hadir') acc[key].hadir.push(record.user?.nama || 'Unknown');
+    if (record.status === 'Terlambat') acc[key].terlambat.push(record.user?.nama || 'Unknown');
+    if (record.status === 'Tidak Hadir') acc[key].tidakHadir.push(record.user?.nama || 'Unknown');
+    return acc;
+  }, {})), [records]);
 
   // Group records by date
   const groupedRecords = records.reduce((acc, record) => {
@@ -85,12 +98,13 @@ const AdminAttendance = () => {
       </div>
 
       {/* Stats bar */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-3 print:hidden">
+      <div className="grid grid-cols-2 md:grid-cols-6 gap-3 print:hidden">
         <StatCard label="Total Mahasiswa" value={totalMahasiswa} accent="#00f0ff" />
         <StatCard label="Total Absensi" value={stats.total} accent="#ffffff" />
         <StatCard label="Mahasiswa Hadir" value={stats.uniqueMhs} accent="#10b981" />
         <StatCard label="Hadir" value={stats.hadir} accent="#10b981" />
         <StatCard label="Terlambat" value={stats.terlambat} accent="#f59e0b" />
+        <StatCard label="Tidak Hadir" value={stats.tidakHadir} accent="#ef4444" />
       </div>
 
       <Card className="p-6 bg-glass border-glass-border mb-6 print:hidden">
@@ -139,8 +153,40 @@ const AdminAttendance = () => {
         <div className="hidden print:block mb-4">
           <h1 style={{ fontSize: '20px', fontWeight: 'bold' }}>Rekap Absensi KKN</h1>
           <p>Periode: {filters.tanggal_dari} s/d {filters.tanggal_sampai}</p>
-          <p>Total Mahasiswa: {totalMahasiswa} | Total Absensi: {stats.total} (Hadir: {stats.hadir}, Terlambat: {stats.terlambat})</p>
+          <p>Total Mahasiswa: {totalMahasiswa} | Total Absensi: {stats.total} | Hadir: {stats.hadir} | Terlambat: {stats.terlambat} | Tidak Hadir: {stats.tidakHadir}</p>
         </div>
+
+        {records.length > 0 && (
+          <Card className="bg-glass border-glass-border overflow-hidden">
+            <div className="p-6">
+              <h2 className="text-xl font-heading font-semibold text-white mb-4">Ringkasan Per Kegiatan</h2>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-primary-100">
+                  <thead className="bg-surface-lighter/50 text-primary-300 text-sm uppercase">
+                    <tr>
+                      <th className="px-4 py-3 font-medium">Kegiatan</th>
+                      <th className="px-4 py-3 font-medium">Hadir</th>
+                      <th className="px-4 py-3 font-medium">Terlambat</th>
+                      <th className="px-4 py-3 font-medium">Tidak Hadir</th>
+                      <th className="px-4 py-3 font-medium">Total</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-glass-border">
+                    {activitySummary.map((item) => (
+                      <tr key={item.activity}>
+                        <td className="px-4 py-3 font-medium text-white">{item.activity}</td>
+                        <td className="px-4 py-3">{item.hadir.length}<div className="text-xs text-primary-400">{item.hadir.join(', ') || '-'}</div></td>
+                        <td className="px-4 py-3">{item.terlambat.length}<div className="text-xs text-primary-400">{item.terlambat.join(', ') || '-'}</div></td>
+                        <td className="px-4 py-3">{item.tidakHadir.length}<div className="text-xs text-primary-400">{item.tidakHadir.join(', ') || '-'}</div></td>
+                        <td className="px-4 py-3">{item.total}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </Card>
+        )}
 
         {loading ? (
           <Card className="bg-glass border-glass-border overflow-hidden print:hidden">
@@ -179,6 +225,7 @@ const AdminAttendance = () => {
                         <tr>
                           <th className="px-6 py-4 font-medium">Foto</th>
                           <th className="px-6 py-4 font-medium">Peserta</th>
+                          <th className="px-6 py-4 font-medium">Kegiatan</th>
                           <th className="px-6 py-4 font-medium">Waktu</th>
                           <th className="px-6 py-4 font-medium">Status</th>
                           <th className="px-6 py-4 font-medium">Similarity</th>
@@ -197,6 +244,9 @@ const AdminAttendance = () => {
                             <td className="px-6 py-4">
                               <div className="font-medium text-white">{record.user?.nama || 'Unknown'}</div>
                               <div className="text-sm text-primary-400">{record.user?.nim || '-'}</div>
+                            </td>
+                            <td className="px-6 py-4">
+                              <div className="font-medium text-white">{record.activity?.nama || '-'}</div>
                             </td>
                             <td className="px-6 py-4">
                               <div className="font-medium">{record.waktu_absen}</div>

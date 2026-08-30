@@ -69,6 +69,16 @@ class User extends Authenticatable
         return $this->belongsTo(\App\Models\Division::class);
     }
 
+    public function rabItems()
+    {
+        return $this->hasMany(RabItem::class);
+    }
+
+    public function reviewedRabItems()
+    {
+        return $this->hasMany(RabItem::class, 'reviewed_by');
+    }
+
     public function isBendahara(): bool
     {
         if ($this->role === 'admin')

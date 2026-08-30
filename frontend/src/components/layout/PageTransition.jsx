@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef } from 'react';
+import { useRef } from 'react';
 import { useLocation } from 'react-router';
 import gsap from 'gsap';
 import { useGSAP } from '@gsap/react';
@@ -10,6 +10,8 @@ export default function PageTransition({ children }) {
     const location = useLocation();
 
     useGSAP(() => {
+        if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+
         // A cool staggering animation for elements within the page
         gsap.fromTo(
             container.current,

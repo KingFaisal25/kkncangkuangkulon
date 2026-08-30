@@ -1,10 +1,11 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import useCamera from '../../hooks/useCamera';
 import useFaceDetection from '../../hooks/useFaceDetection';
 import useFaceRecognition from '../../hooks/useFaceRecognition';
 import CameraView from './CameraView';
 import Button from '../ui/Button';
 import LoadingSpinner from '../ui/LoadingSpinner';
+import { pickBestFaceFrame } from '../../utils/imageQuality';
 
 export default function FaceCapture({ onCapture, onCancel, autoCapture = false }) {
   const { videoRef, isActive, error: cameraError, startCamera, stopCamera, captureBase64 } = useCamera();
@@ -13,28 +14,84 @@ export default function FaceCapture({ onCapture, onCancel, autoCapture = false }
   const [captured, setCaptured] = useState(null);
   const [processing, setProcessing] = useState(false);
   const [error, setError] = useState(null);
-
+  const stableFramesRef = useRef(0);
   useEffect(() => {
     startCamera();
     return () => stopCamera();
   }, [startCamera, stopCamera]);
 
-  const handleCapture = useCallback(async () => {
-    if (!faceDetected) return;
+  const getFaceQuality = useCallback(() => {
+    const videoElement = videoRef.current?.video || videoRef.current;
+    if (!landmarks?.length || !videoElement?.videoWidth || !videoElement?.videoHeight) {
+      return { ready: false, reason: 'Wajah belum cukup jelas.' };
+    }
 
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+
+    landmarks.forEach((point) => {
+      minX = Math.min(minX, point.x);
+      minY = Math.min(minY, point.y);
+      maxX = Math.max(maxX, point.x);
+      maxY = Math.max(maxY, point.y);
+    });
+
+    const width = maxX - minX;
+    const height = maxY - minY;
+    const area = width * height;
+    const centerX = minX + width / 2;
+    const centerY = minY + height / 2;
+    const offsetX = Math.abs(centerX - 0.5);
+    const offsetY = Math.abs(centerY - 0.5);
+
+    if (width < 0.18 || height < 0.22) {
+      return { ready: false, reason: 'Wajah terlalu jauh. Dekatkan kamera.' };
+    }
+
+    if (area < 0.04) {
+      return { ready: false, reason: 'Wajah terlalu kecil di frame.' };
+    }
+
+    if (offsetX > 0.16 || offsetY > 0.16) {
+      return { ready: false, reason: 'Pusatkan wajah di tengah kamera.' };
+    }
+
+    if (minX < 0.03 || minY < 0.03 || maxX > 0.97 || maxY > 0.97) {
+      return { ready: false, reason: 'Wajah terlalu mepet tepi frame.' };
+    }
+
+    return { ready: true, reason: '' };
+  }, [landmarks, videoRef]);
+
+  useEffect(() => {
+    stableFramesRef.current = faceDetected && getFaceQuality().ready ? stableFramesRef.current + 1 : 0;
+  }, [faceDetected, getFaceQuality]);
+
+  const handleCapture = useCallback(async () => {
     try {
       setProcessing(true);
       setError(null);
 
-      const imageBase64 = captureBase64(0.9);
-      if (!imageBase64) {
+      const faceQuality = getFaceQuality();
+      if (!faceDetected || !faceQuality.ready) {
+        throw new Error(faceQuality.reason || 'Wajah belum terdeteksi. Coba posisikan wajah lebih jelas.');
+      }
+
+      const bestFrame = await pickBestFaceFrame(async () => {
+        const imageBase64 = captureBase64();
+        const imageElement = videoRef.current?.video;
+        return imageBase64 && imageElement ? { imageBase64, imageElement } : null;
+      });
+
+      if (!bestFrame) {
         throw new Error('Gagal mengambil gambar');
       }
 
-      // Generate face embedding directly from the live video element to avoid compression/scaling issues
-      const embedding = await generateEmbedding(videoRef.current?.video || imageBase64);
+      const embedding = await generateEmbedding(bestFrame.imageBase64);
 
-      setCaptured({ imageBase64, embedding });
+      setCaptured({ imageBase64: bestFrame.imageBase64, embedding });
       stopCamera();
     } catch (err) {
       console.error('Capture error:', err);
@@ -42,7 +99,7 @@ export default function FaceCapture({ onCapture, onCancel, autoCapture = false }
     } finally {
       setProcessing(false);
     }
-  }, [faceDetected, captureBase64, generateEmbedding, stopCamera]);
+  }, [captureBase64, faceDetected, generateEmbedding, getFaceQuality, stopCamera, videoRef]);
 
   const handleRecapture = useCallback(() => {
     setCaptured(null);
@@ -64,12 +121,15 @@ export default function FaceCapture({ onCapture, onCancel, autoCapture = false }
   // Auto capture logic
   useEffect(() => {
     if (autoCapture && faceDetected && !processing && !captured) {
+      const faceQuality = getFaceQuality();
+      if (!faceQuality.ready || stableFramesRef.current < 2) return;
+
       const timer = setTimeout(() => {
         handleCapture();
-      }, 1500); // 1.5 seconds delay before auto capture
+      }, 400); // faster auto capture
       return () => clearTimeout(timer);
     }
-  }, [autoCapture, faceDetected, processing, captured, handleCapture]);
+  }, [autoCapture, faceDetected, processing, captured, getFaceQuality, handleCapture]);
 
   // Auto confirm logic
   useEffect(() => {
@@ -101,7 +161,7 @@ export default function FaceCapture({ onCapture, onCancel, autoCapture = false }
       <div className="space-y-4 animate-fade-in">
         <div className="text-center mb-2">
           <h3 className="font-heading font-semibold text-lg">Preview Foto</h3>
-          <p className="text-sm text-white/50">Pastikan foto wajah Anda jelas dan terlihat</p>
+          <p className="text-sm text-white/50">Pastikan wajah terlihat jelas</p>
         </div>
 
         <div className="relative rounded-2xl overflow-hidden max-w-sm mx-auto">
@@ -142,7 +202,7 @@ export default function FaceCapture({ onCapture, onCancel, autoCapture = false }
     <div className="space-y-4">
       <div className="text-center mb-2">
         <h3 className="font-heading font-semibold text-lg">Ambil Foto Wajah</h3>
-        <p className="text-sm text-white/50">Posisikan wajah Anda dalam lingkaran</p>
+        <p className="text-sm text-white/50">Posisikan wajah di tengah lingkaran</p>
       </div>
 
       <CameraView
@@ -166,7 +226,7 @@ export default function FaceCapture({ onCapture, onCancel, autoCapture = false }
         )}
         <Button
           fullWidth
-          disabled={!faceDetected || processing}
+          disabled={processing}
           loading={processing}
           onClick={handleCapture}
         >

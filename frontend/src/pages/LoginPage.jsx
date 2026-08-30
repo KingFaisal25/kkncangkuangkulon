@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router';
 import { useAuth } from '../context/AuthContext';
 import Input from '../components/ui/Input';
+import Modal from '../components/ui/Modal';
 import gsap from 'gsap';
 import { useGSAP } from '@gsap/react';
 
@@ -165,6 +166,8 @@ export default function LoginPage() {
   const [successMessage, setSuccessMessage] = useState(location.state?.message || '');
   const [showPass, setShowPass] = useState(false);
   const [remember, setRemember] = useState(true);
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const [copied, setCopied] = useState(false);
   const containerRef = useRef(null);
 
   useGSAP(() => {
@@ -219,8 +222,14 @@ export default function LoginPage() {
     }
   };
 
+  const copyResetRequest = async () => {
+    const nim = form.nim.trim() || '[isi NIM Anda]';
+    await navigator.clipboard.writeText(`Halo Admin, saya lupa password akun absensi KKN dengan NIM ${nim}. Mohon bantu reset password saya.`);
+    setCopied(true);
+  };
+
   return (
-    <div ref={containerRef} className="min-h-screen flex flex-col lg:flex-row relative overflow-hidden" style={{ background: '#05050f' }}>
+    <div ref={containerRef} className="min-h-screen flex flex-col lg:flex-row relative overflow-hidden">
       <div className="gradient-mesh" />
       <Particles />
 
@@ -369,7 +378,7 @@ export default function LoginPage() {
                     <input type="checkbox" checked={remember} onChange={e => setRemember(e.target.checked)} className="w-4 h-4 rounded border-white/20 bg-white/5 accent-primary-500" />
                     Ingat saya
                   </label>
-                  <button type="button" className="text-primary-400 hover:text-primary-300 font-semibold transition-colors">Lupa password?</button>
+                  <button type="button" onClick={() => { setCopied(false); setShowForgotPassword(true); }} className="text-primary-400 hover:text-primary-300 font-semibold transition-colors">Lupa password?</button>
                 </div>
 
                 {/* Submit with shine sweep */}
@@ -406,6 +415,24 @@ export default function LoginPage() {
           </div>
         </div>
       </div>
+
+      <Modal isOpen={showForgotPassword} onClose={() => setShowForgotPassword(false)} title="Lupa Password">
+        <div className="space-y-5 text-sm">
+          <div className="rounded-xl border border-primary-400/20 bg-primary-500/10 p-4 text-white/70">
+            Hubungi admin untuk verifikasi identitas dan reset password akun Anda. Jangan kirim password lama kepada siapa pun.
+          </div>
+          <div>
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-white/40">Pesan untuk admin</p>
+            <p className="rounded-xl bg-white/5 p-4 text-white/80">
+              Halo Admin, saya lupa password akun absensi KKN dengan NIM <strong className="text-white">{form.nim.trim() || '[isi NIM Anda]'}</strong>. Mohon bantu reset password saya.
+            </p>
+          </div>
+          {/* ponytail: gunakan reset bertoken saat akun memiliki email atau nomor telepon terverifikasi. */}
+          <button type="button" onClick={copyResetRequest} className="btn-primary w-full py-3 font-semibold">
+            {copied ? 'Pesan Berhasil Disalin' : 'Salin Pesan Permintaan Reset'}
+          </button>
+        </div>
+      </Modal>
     </div>
   );
 }

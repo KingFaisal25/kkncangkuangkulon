@@ -1,6 +1,5 @@
 import { Navigate, Outlet } from 'react-router';
 import { useAuth } from '../../context/AuthContext';
-import Navbar from './Navbar';
 import LoadingSpinner from '../ui/LoadingSpinner';
 
 export default function ProtectedRoute({ requireAdmin = false }) {

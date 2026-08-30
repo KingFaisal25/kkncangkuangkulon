@@ -1,0 +1,22 @@
+{
+  "name": "Absensi KKN Cangkuang Kulon",
+  "short_name": "Absensi KKN",
+  "description": "Sistem Absensi KKN Cangkuang Kulon berbasis pengenalan wajah.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0f0f23",
+  "theme_color": "#0f0f23",
+  "lang": "id-ID",
+  "icons": [
+    {
+      "src": "/apple-touch-icon.png",
+      "sizes": "180x180",
+      "type": "image/png"
+    },
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}

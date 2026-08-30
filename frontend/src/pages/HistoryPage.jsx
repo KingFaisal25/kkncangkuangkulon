@@ -16,7 +16,7 @@ const HistoryPage = () => {
         if (response.success && response.data) {
           setHistory(response.data.data || response.data);
         }
-      } catch (err) {
+      } catch {
         setError('Gagal memuat riwayat absensi.');
       } finally {
         setLoading(false);

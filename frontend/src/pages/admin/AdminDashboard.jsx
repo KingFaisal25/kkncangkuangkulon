@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import Card from '../../components/ui/Card';
 import StatsCard from '../../components/ui/StatsCard';
 import Button from '../../components/ui/Button';
 import adminService from '../../services/adminService';
 import api from '../../services/api';
+import { useCallback } from 'react';
 
 const AdminDashboard = () => {
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
@@ -11,12 +11,7 @@ const AdminDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [progress, setProgress] = useState(null);
 
-  useEffect(() => {
-    fetchSummary();
-    api.get('/admin/dashboard/progress').then(({ data }) => setProgress(data.data));
-  }, [date]);
-
-  const fetchSummary = async () => {
+  const fetchSummary = useCallback(async () => {
     try {
       setLoading(true);
       const res = await adminService.getSummary({ tanggal: date });
@@ -28,7 +23,12 @@ const AdminDashboard = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [date]);
+
+  useEffect(() => {
+    fetchSummary();
+    api.get('/admin/dashboard/progress').then(({ data }) => setProgress(data.data));
+  }, [fetchSummary, date]);
 
   const handleExport = () => {
     adminService.exportExcel({ tanggal_dari: date, tanggal_sampai: date });

@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
+import NotificationMenu from './NotificationMenu';
 
 export default function Navbar() {
   const { user, logout, isAdmin } = useAuth();
@@ -99,14 +100,14 @@ export default function Navbar() {
 
   return (
     <header className="sticky top-0 z-50 pt-2 pb-1 px-3 sm:px-6">
-      <nav className="max-w-7xl mx-auto bg-[#09091e]/85 backdrop-blur-2xl border border-white/10 rounded-2xl shadow-[0_10px_30px_rgba(0,0,0,0.5)] transition-all duration-300">
+      <nav className="app-navbar max-w-7xl mx-auto rounded-2xl transition-all duration-300">
         <div className="px-3 sm:px-5">
           <div className="flex items-center justify-between h-16 gap-3">
 
             {/* 1. Brand Logo */}
             <Link to={isAdmin ? '/admin' : '/'} className="flex items-center gap-2.5 shrink-0 group">
               <div className="relative flex items-center justify-center w-9 h-9 rounded-xl bg-gradient-to-tr from-primary-600 via-primary-500 to-accent-cyan p-0.5 shadow-md shadow-primary-500/20 group-hover:scale-105 transition-transform duration-300">
-                <div className="w-full h-full bg-[#070716] rounded-[10px] flex items-center justify-center">
+                <div className="w-full h-full bg-slate-950/90 rounded-[10px] flex items-center justify-center">
                   <svg className="w-4 h-4 text-accent-cyan animate-pulse-glow" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
                   </svg>
@@ -237,6 +238,8 @@ export default function Navbar() {
                 <span>{timeStr}</span>
               </div>
 
+              <NotificationMenu />
+
               {/* User Profile Popover */}
               <div className="relative" ref={userMenuRef}>
                 <button
@@ -256,7 +259,7 @@ export default function Navbar() {
 
                 {/* User Popover Card */}
                 {userMenuOpen && (
-                  <div className="absolute right-0 mt-2 w-64 p-4 rounded-2xl bg-[#0b0c24]/95 backdrop-blur-2xl border border-white/10 shadow-2xl space-y-3 animate-fade-in-down">
+              <div className="app-popover absolute right-0 mt-2 w-64 p-4 rounded-2xl space-y-3 animate-fade-in-down">
                     {/* Header */}
                     <div className="flex items-center gap-3 pb-3 border-b border-white/10">
                       <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-primary-500 to-accent-cyan flex items-center justify-center text-sm font-bold text-white shrink-0">

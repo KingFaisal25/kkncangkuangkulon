@@ -1,6 +1,17 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import * as faceapi from '@vladmandic/face-api';
 
+let modelPromise;
+
+const loadFaceRecognitionModels = () => {
+  modelPromise ??= Promise.all([
+    faceapi.nets.ssdMobilenetv1.loadFromUri('/models'),
+    faceapi.nets.faceLandmark68Net.loadFromUri('/models'),
+    faceapi.nets.faceRecognitionNet.loadFromUri('/models'),
+  ]);
+  return modelPromise;
+};
+
 export default function useFaceRecognition() {
   const [isModelLoaded, setIsModelLoaded] = useState(false);
   const [loadingProgress, setLoadingProgress] = useState('');
@@ -12,18 +23,13 @@ export default function useFaceRecognition() {
 
     try {
       setLoadingProgress('Memuat model pengenalan wajah...');
-      const MODEL_URL = '/models';
-
-      await Promise.all([
-        faceapi.nets.ssdMobilenetv1.loadFromUri(MODEL_URL),
-        faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
-        faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL),
-      ]);
+      await loadFaceRecognitionModels();
 
       loadedRef.current = true;
       setIsModelLoaded(true);
       setLoadingProgress('');
     } catch (err) {
+      modelPromise = undefined;
       console.error('Face-api models load error:', err);
       setLoadingProgress(
         'Gagal memuat model pengenalan wajah. Pastikan file model tersedia di /models/'
@@ -38,9 +44,7 @@ export default function useFaceRecognition() {
   // Generate face embedding from an image element or canvas
   const generateEmbedding = useCallback(
     async (imageInput) => {
-      if (!isModelLoaded) {
-        throw new Error('Model belum dimuat');
-      }
+      await loadFaceRecognitionModels();
 
       let inputElement = imageInput;
 
@@ -70,7 +74,7 @@ export default function useFaceRecognition() {
       // Return as regular array (128 floats)
       return Array.from(detection.descriptor);
     },
-    [isModelLoaded]
+    []
   );
 
   return {

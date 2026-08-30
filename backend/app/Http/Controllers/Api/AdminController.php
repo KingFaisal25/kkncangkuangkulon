@@ -74,7 +74,6 @@ class AdminController extends Controller
                 $query->where('status', $request->status);
             }
 
-            // Search by nama or NIM
             if ($request->filled('search')) {
                 $search = $request->search;
                 $query->whereHas('user', function ($q) use ($search) {
@@ -187,7 +186,29 @@ class AdminController extends Controller
 
             // Build CSV
             $csvContent = "\xEF\xBB\xBF"; // UTF-8 BOM for Excel
-            $csvContent .= "No,Nama,NIM,Jurusan,Tanggal,Waktu,Status,Similarity\n";
+            $csvContent .= "LAPORAN ABSENSI KKN\n";
+            $csvContent .= "Periode," . ($request->get('tanggal_dari') ?: '-') . " s/d " . ($request->get('tanggal_sampai') ?: '-') . "\n";
+            $csvContent .= "Total Absensi," . $records->count() . "\n";
+            $csvContent .= "Hadir," . $records->where('status', 'Hadir')->count() . "\n";
+            $csvContent .= "Terlambat," . $records->where('status', 'Terlambat')->count() . "\n";
+            $csvContent .= "Tidak Hadir," . $records->where('status', 'Tidak Hadir')->count() . "\n\n";
+
+            $csvContent .= "RINGKASAN PER KEGIATAN\n";
+            $csvContent .= "Kegiatan,Tanggal,Hadir,Terlambat,Tidak Hadir,Total\n";
+            foreach ($records->groupBy('activity_id') as $activityRecords) {
+                $first = $activityRecords->first();
+                $csvContent .= implode(',', [
+                    '"' . str_replace('"', '""', $first->activity->nama ?? '-') . '"',
+                    $first->tanggal?->format('Y-m-d') ?? '-',
+                    $activityRecords->where('status', 'Hadir')->count(),
+                    $activityRecords->where('status', 'Terlambat')->count(),
+                    $activityRecords->where('status', 'Tidak Hadir')->count(),
+                    $activityRecords->count(),
+                ]) . "\n";
+            }
+
+            $csvContent .= "\nDETAIL PESERTA\n";
+            $csvContent .= "No,Nama,NIM,Jurusan,Kegiatan,Tanggal,Waktu,Status,Similarity\n";
 
             $no = 1;
             foreach ($records as $record) {
@@ -196,6 +217,7 @@ class AdminController extends Controller
                     '"' . str_replace('"', '""', $record->user->nama ?? '') . '"',
                     '"' . ($record->user->nim ?? '') . '"',
                     '"' . str_replace('"', '""', $record->user->jurusan ?? '') . '"',
+                    '"' . str_replace('"', '""', $record->activity->nama ?? '-') . '"',
                     $record->tanggal->format('Y-m-d'),
                     $record->waktu_absen,
                     $record->status,

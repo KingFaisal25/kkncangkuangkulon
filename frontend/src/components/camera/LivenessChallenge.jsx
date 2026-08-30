@@ -37,7 +37,6 @@ export default function LivenessChallenge({ onComplete, onCancel }) {
     currentStep,
     currentStepIndex,
     totalSteps,
-    progress,
     stepProgress,
     isCompleted,
     error: livenessError,
@@ -62,7 +61,7 @@ export default function LivenessChallenge({ onComplete, onCancel }) {
 
   // On completed, capture frame and call onComplete
   const handleComplete = useCallback(() => {
-    const imageBase64 = captureBase64(0.9);
+    const imageBase64 = captureBase64();
     stopCamera();
     onComplete?.({ imageBase64 });
   }, [captureBase64, stopCamera, onComplete]);
@@ -94,7 +93,7 @@ export default function LivenessChallenge({ onComplete, onCancel }) {
     );
   }
 
-  const steps = ['FACE_FRONT', 'FACE_RIGHT', 'FACE_LEFT'];
+  const steps = ['FACE_FRONT', 'BLINK'];
 
   return (
     <div className="space-y-4">
@@ -156,7 +155,7 @@ export default function LivenessChallenge({ onComplete, onCancel }) {
                   {idx + 1}
                 </div>
               )}
-              <span className="text-[10px] font-medium">{step === 'FACE_FRONT' ? 'Depan' : step === 'FACE_RIGHT' ? 'Kanan' : 'Kiri'}</span>
+              <span className="text-[10px] font-medium">{step === 'FACE_FRONT' ? 'Depan' : 'Kedip'}</span>
             </div>
           ))}
         </div>

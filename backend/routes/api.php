@@ -14,6 +14,7 @@ use App\Http\Controllers\Api\DivisionController;
 use App\Http\Controllers\Api\DivisionReportController;
 use App\Http\Controllers\Api\FinancialController;
 use App\Http\Controllers\Api\RabController;
+use App\Http\Controllers\Api\NotificationController;
 
 /*
 |--------------------------------------------------------------------------
@@ -80,17 +81,25 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/finance', [FinancialController::class, 'store']);
     Route::delete('/finance/{financialTransaction}', [FinancialController::class, 'destroy']);
 
-    // -------- RAB (all read; Bendahara + admin write) --------
+    // -------- RAB WORKFLOW --------
     Route::get('/rab', [RabController::class, 'index']);
     Route::post('/rab', [RabController::class, 'store']);
+    Route::get('/rab/{rabItem}', [RabController::class, 'show']);
     Route::put('/rab/{rabItem}', [RabController::class, 'update']);
     Route::delete('/rab/{rabItem}', [RabController::class, 'destroy']);
+    Route::patch('/rab/{rabItem}/status', [RabController::class, 'status']);
+
+    // -------- NOTIFICATIONS --------
+    Route::get('/notifications', [NotificationController::class, 'index']);
+    Route::patch('/notifications/read-all', [NotificationController::class, 'readAll']);
+    Route::patch('/notifications/{notification}/read', [NotificationController::class, 'read']);
 
     // Admin routes
     Route::middleware('admin')->prefix('admin')->group(function () {
         Route::get('/attendance-requests', [AttendanceRequestController::class, 'index']);
         Route::patch('/attendance-requests/{attendanceRequest}', [AttendanceRequestController::class, 'update']);
         Route::get('/reports', [ActivityReportController::class, 'index']);
+        Route::patch('/reports/{activityReport}/publish', [ActivityReportController::class, 'publish']);
         Route::delete('/reports/{activityReport}', [ActivityReportController::class, 'destroy']);
         Route::get('/work-programs', [WorkProgramController::class, 'index']);
         Route::post('/work-programs', [WorkProgramController::class, 'store']);

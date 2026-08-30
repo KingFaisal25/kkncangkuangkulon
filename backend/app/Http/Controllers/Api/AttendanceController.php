@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Helpers\FaceHelper;
 use App\Http\Controllers\Controller;
 use App\Models\Attendance;
+use App\Models\Activity;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -20,7 +21,7 @@ class AttendanceController extends Controller
         try {
             $validated = $request->validate([
                 'activity_id' => 'required|exists:activities,id',
-                'foto_absen' => 'required|string',
+                'foto_absen' => 'required|string|max:200000',
                 'face_embedding' => 'required|array|size:128',
                 'face_embedding.*' => 'required|numeric',
             ], [
@@ -32,8 +33,9 @@ class AttendanceController extends Controller
             $user = $request->user();
             $today = Carbon::now('Asia/Jakarta')->toDateString();
 
-            // Check if already attended today
+            // Check if already attended for this activity today
             $existingAttendance = Attendance::where('user_id', $user->id)
+                ->where('activity_id', $validated['activity_id'])
                 ->whereDate('tanggal', $today)
                 ->first();
 
@@ -72,9 +74,30 @@ class AttendanceController extends Controller
                 ], 403);
             }
 
-            // Determine status based on time
             $currentTime = Carbon::now('Asia/Jakarta');
-            $status = $currentTime->format('H:i') <= '08:00' ? 'Hadir' : 'Terlambat';
+            $activity = Activity::findOrFail($validated['activity_id']);
+            $activityDate = $activity->tanggal->copy()->startOfDay();
+            $openingTime = $activityDate->copy();
+            $deadline = Carbon::parse($activity->tanggal->format('Y-m-d') . ' ' . $activity->jam_selesai, 'Asia/Jakarta');
+
+            if ($currentTime->lt($openingTime)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Absensi belum dibuka untuk tanggal kegiatan ini.',
+                    'data' => [
+                        'status' => 'Belum Dibuka',
+                        'activity_date' => $activityDate->format('Y-m-d'),
+                        'opening_time' => $openingTime->format('Y-m-d H:i:s'),
+                    ],
+                ], 403);
+            }
+
+            $startTime = Carbon::parse($activity->tanggal->format('Y-m-d') . ' ' . $activity->jam_mulai, 'Asia/Jakarta');
+            $status = 'Tidak Hadir';
+
+            if ($currentTime->lessThanOrEqualTo($deadline)) {
+                $status = $currentTime->lessThanOrEqualTo($startTime) ? 'Hadir' : 'Terlambat';
+            }
 
             // Save photo base64 directly to database
             $fotoPath = null;

@@ -43,8 +43,6 @@ export default function CameraView({
       maxY = Math.min(canvas.height, maxY + pad);
 
       // Draw rounded rectangle
-      const w = maxX - minX;
-      const h = maxY - minY;
       const r = 12;
 
       ctx.strokeStyle = faceDetected ? '#10b981' : '#ef4444';
